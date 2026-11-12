@@ -82,7 +82,7 @@
         <button class="btn-sm" onclick="removeCol()">- Hapus Tujuan</button>
       </div>
 
-      <div id="manual-msg"></div>
+      <div id="manual-msg" class="msg"></div>
 
       <div class="table-scroll">
         <div id="manual-table-container"></div>
@@ -118,7 +118,7 @@
     <button class="tab-btn result-tab-btn" data-tab="lc">Hasil Least Cost</button>
   </div>
 
-  <div class="panel result-panel active" id="panel-nwc" style="display:none;">
+  <div class="panel result-panel active" id="panel-nwc">
     <div class="card">
       <h2>Alokasi North-West Corner (NWC)</h2>
       <div id="nwc-table" class="table-scroll"></div>
@@ -126,7 +126,7 @@
     </div>
   </div>
 
-  <div class="panel result-panel" id="panel-lc" style="display:none;">
+  <div class="panel result-panel" id="panel-lc">
     <div class="card">
       <h2>Alokasi Least Cost (LC)</h2>
       <div id="lc-table" class="table-scroll"></div>
@@ -156,6 +156,8 @@
     });
   });
 
+  function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
   // --- MANUAL INPUT LOGIC ---
   let manualData = {
     sources: ["Pabrik 1", "Pabrik 2", "Pabrik 3"],
@@ -168,12 +170,12 @@
   function renderManualTable() {
     let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
     manualData.dests.forEach((d, j) => {
-        html += `<th><input type="text" class="name-input dest-name" value="${d}" data-j="${j}" placeholder="Tujuan ${j+1}"></th>`;
+        html += `<th><input type="text" class="name-input dest-name" value="${esc(d)}" data-j="${j}" placeholder="Tujuan ${j+1}"></th>`;
     });
     html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
 
     manualData.sources.forEach((s, i) => {
-        html += `<tr><th><input type="text" class="name-input src-name" value="${s}" data-i="${i}" placeholder="Sumber ${i+1}"></th>`;
+        html += `<tr><th><input type="text" class="name-input src-name" value="${esc(s)}" data-i="${i}" placeholder="Sumber ${i+1}"></th>`;
         manualData.costs[i].forEach((c, j) => {
             html += `<td><input type="number" class="manual-input cost-val" value="${c}" data-i="${i}" data-j="${j}"></td>`;
         });
@@ -233,15 +235,18 @@
 
   function calculateFromManual() {
     syncManualData();
+    if([...manualData.costs.flat(), ...manualData.supply, ...manualData.demand].some(x => isNaN(x))) {
+        let m = document.getElementById('manual-msg'); m.textContent = 'Isi semua sel dengan angka.'; m.style.display=''; m.className = 'msg err'; return;
+    }
     let totSupp = manualData.supply.reduce((a,b)=>a+b, 0);
     let totDem = manualData.demand.reduce((a,b)=>a+b, 0);
     
     let msgEl = document.getElementById('manual-msg');
     if (totSupp !== totDem) {
         msgEl.textContent = "Peringatan: Total Supply (" + totSupp + ") tidak sama dengan Total Demand (" + totDem + "). Tabel otomatis akan melanjutkan dengan batas terkecil, namun disarankan untuk menyamakan supply dan demand (Dummy).";
-        msgEl.className = 'msg warn';
+        msgEl.style.display = ''; msgEl.className = 'msg warn';
     } else {
-        msgEl.style.display = 'none';
+        msgEl.className = 'msg'; msgEl.textContent = '';
     }
 
     renderOriginal(manualData.sources, manualData.dests, manualData.costs, manualData.supply, manualData.demand, Math.max(totSupp, totDem));
@@ -298,17 +303,11 @@
     let costs = rows.slice(1, -1).map(r => r.slice(1, -1).map(x => Number(x)));
     let supply = rows.slice(1, -1).map(r => Number(r[r.length - 1]));
     let demand = rows[rows.length - 1].slice(1, -1).map(x => Number(x));
-    let totalSupply = supply.reduce((a,b)=>a+b, 0);
+    if([...costs.flat(), ...supply, ...demand].some(x => isNaN(x))) throw new Error("Ada sel non-angka pada biaya/supply/demand.");
 
-    renderOriginal(sources, dests, costs, supply, demand, totalSupply);
-
-    let nwcAlloc = solveNWC([...supply], [...demand]);
-    renderResult(nwcAlloc, costs, sources, dests, supply, demand, 'nwc');
-
-    let lcAlloc = solveLC([...supply], [...demand], costs);
-    renderResult(lcAlloc, costs, sources, dests, supply, demand, 'lc');
-
-    showResults();
+    manualData = { sources, dests, costs, supply, demand };
+    renderManualTable();
+    calculateFromManual();
   }
 
   // --- SOLVER ALGORITHMS ---
@@ -363,10 +362,10 @@
 
   function renderOriginal(sources, dests, costs, supply, demand, total) {
     let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
-    dests.forEach(d => html += `<th>${d}</th>`);
+    dests.forEach(d => html += `<th>${esc(d)}</th>`);
     html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
     for(let i=0; i<sources.length; i++){
-      html += `<tr><th>${sources[i]}</th>`;
+      html += `<tr><th>${esc(sources[i])}</th>`;
       for(let j=0; j<dests.length; j++){
         html += `<td>${costs[i][j]}</td>`;
       }
@@ -383,11 +382,11 @@
     let calcStr = [];
     
     let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
-    dests.forEach(d => html += `<th>${d}</th>`);
+    dests.forEach(d => html += `<th>${esc(d)}</th>`);
     html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
     
     for(let i=0; i<sources.length; i++){
-      html += `<tr><th>${sources[i]}</th>`;
+      html += `<tr><th>${esc(sources[i])}</th>`;
       for(let j=0; j<dests.length; j++){
         let v = alloc[i][j];
         let c = costs[i][j];
