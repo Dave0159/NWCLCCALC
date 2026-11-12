@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solver Transportasi - NWC & Least Cost</title>
+<style>
+  :root{
+    --bg:#F6F4EE; --surface:#FFFFFF; --ink:#1E2422; --muted:#6B7568; --line:#E1DDD1;
+    --teal:#0F6E62; --teal-dark:#0A4D44; --amber:#C2740A; --cream-2:#EFEBDE;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'Manrope', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); padding:28px 18px 60px; line-height:1.5; }
+  .wrap{max-width:1180px; margin:0 auto;}
+  header.hero{ border:1px solid var(--line); background:linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); border-radius:14px; padding:28px 30px; color:#F3F1E6; margin-bottom:22px;}
+  header.hero h1{margin:0 0 8px; font-size:26px;}
+  header.hero p{margin:0; opacity:.88; font-size:14.5px;}
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:18px;}
+  .card h2{font-size:16px; margin:0 0 4px;}
+  .card .desc{color:var(--muted); font-size:13px; margin:0 0 14px;}
+  .dropzone{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13.5px;cursor:pointer;background:#FCFBF7;}
+  .dropzone:hover{border-color:var(--teal);background:#E4F2EE;color:var(--teal-dark);}
+  table{border-collapse:collapse; width:100%; font-size:13px;}
+  th,td{border:1px solid var(--line); padding:6px 10px; text-align:center;}
+  th{background:var(--cream-2); color:var(--teal-dark);}
+  .table-scroll{overflow-x:auto; border-radius:8px;}
+  .tabs{display:flex; gap:6px; margin-bottom:16px;}
+  .tab-btn{flex:1; padding:12px 16px; border-radius:10px; border:1px solid var(--line); background:var(--surface); cursor:pointer; font-weight:700; color:var(--muted);}
+  .tab-btn.active{background:var(--teal); color:#fff; border-color:var(--teal);}
+  .panel{display:none;} .panel.active{display:block;}
+  .hit{font-weight:700; color:var(--teal-dark); background:#E4F2EE;}
+  .empty-cell{color:#999; font-weight:bold;}
+  .calc-box{margin-top:15px; padding:15px; background:#FCFBF7; border:1px solid var(--line); border-radius:8px; font-family:var(--mono); font-size:13px;}
+  .msg{font-size:12.5px;margin-top:10px;padding:7px 11px;border-radius:7px;display:none;}
+  .msg.err{display:block;background:#FBE4E4;color:#9B1C1C;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>Solver Transportasi: NWC & Least Cost</h1>
+    <p>Unggah file .xlsx berisi tabel transportasi. Program akan otomatis membaca tabel dan menghitung total biaya menggunakan metode NWC dan LC. Sel yang tidak dialokasikan akan diberi tanda <b>X</b>.</p>
+  </header>
+
+  <div class="card">
+    <h2>Unggah Dataset <span style="font-family:var(--mono); font-size:12px; background:var(--cream-2); color:var(--teal-dark); padding:2px 6px; border-radius:4px;">.xlsx</span></h2>
+    <p class="desc">Format tabel: Baris pertama berisi header tujuan dan kolom "Supply". Kolom pertama berisi nama sumber. Baris terakhir berisi "Demand" dan masing-masing permintaannya.</p>
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+      <strong>Klik untuk memilih file</strong> atau seret file Excel ke sini
+    </label>
+    <div id="upload-msg" class="msg"></div>
+  </div>
+
+  <div class="card" id="dataset-card" style="display:none;">
+    <h2>Tabel Biaya Transportasi Awal</h2>
+    <div id="dataset-table" class="table-scroll"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="nwc">Metode NWC</button>
+    <button class="tab-btn" data-tab="lc">Metode Least Cost (LC)</button>
+  </div>
+
+  <div class="panel active" id="panel-nwc">
+    <div class="card">
+      <h2>Hasil Alokasi North-West Corner (NWC)</h2>
+      <div id="nwc-table" class="table-scroll"></div>
+      <div id="nwc-calc" class="calc-box"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-lc">
+    <div class="card">
+      <h2>Hasil Alokasi Least Cost (LC)</h2>
+      <div id="lc-table" class="table-scroll"></div>
+      <div id="lc-calc" class="calc-box"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value=''; });
+  const dz = document.getElementById('dropzone');
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+  function showError(msg) {
+      const el = document.getElementById('upload-msg');
+      el.textContent = msg; el.className = 'msg err';
+  }
+
+  function loadFile(file) {
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ""});
+        processData(jsonData);
+        document.getElementById('upload-msg').className = 'msg';
+      } catch (err) {
+        showError("Gagal membaca file: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function processData(rows) {
+    rows = rows.filter(r => r.some(cell => String(cell).trim() !== ''));
+    if(rows.length < 3) throw new Error("Format tabel tidak lengkap.");
+
+    let destNames = rows[0].slice(1, -1).map(x => String(x).trim());
+    let sourceNames = rows.slice(1, -1).map(r => String(r[0]).trim());
+    
+    let costs = rows.slice(1, -1).map(r => r.slice(1, -1).map(x => Number(x)));
+    let supply = rows.slice(1, -1).map(r => Number(r[r.length - 1]));
+    let demand = rows[rows.length - 1].slice(1, -1).map(x => Number(x));
+    let totalSupply = supply.reduce((a,b)=>a+b, 0);
+
+    renderOriginal(sourceNames, destNames, costs, supply, demand, totalSupply);
+
+    let nwcAlloc = solveNWC([...supply], [...demand]);
+    renderResult(nwcAlloc, costs, sourceNames, destNames, supply, demand, 'nwc');
+
+    let lcAlloc = solveLC([...supply], [...demand], costs);
+    renderResult(lcAlloc, costs, sourceNames, destNames, supply, demand, 'lc');
+
+    document.getElementById('dataset-card').style.display = 'block';
+  }
+
+  function solveNWC(supply, demand) {
+    let m = supply.length;
+    let n = demand.length;
+    let alloc = Array.from({length: m}, () => Array(n).fill(0));
+    let i = 0, j = 0;
+    while(i < m && j < n) {
+      let qty = Math.min(supply[i], demand[j]);
+      alloc[i][j] = qty;
+      supply[i] -= qty;
+      demand[j] -= qty;
+      if(supply[i] === 0) i++;
+      else j++;
+    }
+    return alloc;
+  }
+
+  function solveLC(supply, demand, costs) {
+    let m = supply.length;
+    let n = demand.length;
+    let alloc = Array.from({length: m}, () => Array(n).fill(0));
+    
+    let cells = [];
+    for(let i=0; i<m; i++){
+      for(let j=0; j<n; j++){
+        cells.push({i, j, cost: costs[i][j]});
+      }
+    }
+    cells.sort((a,b) => a.cost - b.cost);
+
+    for(let cell of cells) {
+      let i = cell.i, j = cell.j;
+      if(supply[i] > 0 && demand[j] > 0) {
+        let qty = Math.min(supply[i], demand[j]);
+        alloc[i][j] = qty;
+        supply[i] -= qty;
+        demand[j] -= qty;
+      }
+    }
+    return alloc;
+  }
+
+  function renderOriginal(sources, dests, costs, supply, demand, total) {
+    let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
+    dests.forEach(d => html += `<th>${d}</th>`);
+    html += '<th>Supply</th></tr></thead><tbody>';
+    for(let i=0; i<sources.length; i++){
+      html += `<tr><th>${sources[i]}</th>`;
+      for(let j=0; j<dests.length; j++){
+        html += `<td>${costs[i][j]}</td>`;
+      }
+      html += `<th>${supply[i]}</th></tr>`;
+    }
+    html += `<tr><th>Demand</th>`;
+    demand.forEach(d => html += `<th>${d}</th>`);
+    html += `<th>${total}</th></tr></tbody></table>`;
+    document.getElementById('dataset-table').innerHTML = html;
+  }
+
+  function renderResult(alloc, costs, sources, dests, supply, demand, prefix) {
+    let totalCost = 0;
+    let calcStr = [];
+    
+    let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
+    dests.forEach(d => html += `<th>${d}</th>`);
+    html += '<th>Supply</th></tr></thead><tbody>';
+    
+    for(let i=0; i<sources.length; i++){
+      html += `<tr><th>${sources[i]}</th>`;
+      for(let j=0; j<dests.length; j++){
+        let v = alloc[i][j];
+        let c = costs[i][j];
+        if(v > 0) {
+          html += `<td class="hit">${v} (${c})</td>`;
+          totalCost += v * c;
+          calcStr.push(`(${v} &times; ${c})`);
+        } else {
+          html += `<td class="empty-cell">X</td>`;
+        }
+      }
+      html += `<th>${supply[i]}</th></tr>`;
+    }
+    html += `<tr><th>Demand</th>`;
+    demand.forEach(d => html += `<th>${d}</th>`);
+    let total = supply.reduce((a,b)=>a+b,0);
+    html += `<th>${total}</th></tr></tbody></table>`;
+    
+    document.getElementById(`${prefix}-table`).innerHTML = html;
+    document.getElementById(`${prefix}-calc`).innerHTML = 
+      "<strong>Perhitungan Total Cost:</strong><br/>= " + calcStr.join(' + ') + "<br/>= <strong>" + totalCost + "</strong>";
+  }
+</script>
+</body>
+</html>
