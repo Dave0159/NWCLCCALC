@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Solver Transportasi - NWC & Least Cost</title>
+<title>Solver Transportasi - NWC & Least Cost (Upload & Manual)</title>
 <style>
   :root{
     --bg:#F6F4EE; --surface:#FFFFFF; --ink:#1E2422; --muted:#6B7568; --line:#E1DDD1;
@@ -16,64 +16,119 @@
   header.hero{ border:1px solid var(--line); background:linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); border-radius:14px; padding:28px 30px; color:#F3F1E6; margin-bottom:22px;}
   header.hero h1{margin:0 0 8px; font-size:26px;}
   header.hero p{margin:0; opacity:.88; font-size:14.5px;}
+  
   .card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:18px;}
-  .card h2{font-size:16px; margin:0 0 4px;}
+  .card h2{font-size:16px; margin:0 0 10px;}
   .card .desc{color:var(--muted); font-size:13px; margin:0 0 14px;}
+  
   .dropzone{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13.5px;cursor:pointer;background:#FCFBF7;}
   .dropzone:hover{border-color:var(--teal);background:#E4F2EE;color:var(--teal-dark);}
-  table{border-collapse:collapse; width:100%; font-size:13px;}
+  
+  table{border-collapse:collapse; width:100%; font-size:13px; margin-bottom: 10px;}
   th,td{border:1px solid var(--line); padding:6px 10px; text-align:center;}
   th{background:var(--cream-2); color:var(--teal-dark);}
   .table-scroll{overflow-x:auto; border-radius:8px;}
+  
   .tabs{display:flex; gap:6px; margin-bottom:16px;}
-  .tab-btn{flex:1; padding:12px 16px; border-radius:10px; border:1px solid var(--line); background:var(--surface); cursor:pointer; font-weight:700; color:var(--muted);}
+  .tab-btn{flex:1; padding:12px 16px; border-radius:10px; border:1px solid var(--line); background:var(--surface); cursor:pointer; font-weight:700; color:var(--muted); font-family:var(--sans);}
   .tab-btn.active{background:var(--teal); color:#fff; border-color:var(--teal);}
+  
   .panel{display:none;} .panel.active{display:block;}
   .hit{font-weight:700; color:var(--teal-dark); background:#E4F2EE;}
   .empty-cell{color:#999; font-weight:bold;}
   .calc-box{margin-top:15px; padding:15px; background:#FCFBF7; border:1px solid var(--line); border-radius:8px; font-family:var(--mono); font-size:13px;}
+  
   .msg{font-size:12.5px;margin-top:10px;padding:7px 11px;border-radius:7px;display:none;}
   .msg.err{display:block;background:#FBE4E4;color:#9B1C1C;}
+  .msg.warn{display:block;background:#FFF4E5;color:#663C00; margin-bottom: 10px;}
+
+  /* Input Manual Styles */
+  .control-group { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
+  .btn-sm { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--teal); background: white; color: var(--teal); cursor: pointer; font-weight: bold; font-family: var(--sans);}
+  .btn-sm:hover { background: var(--cream-2); }
+  .btn-primary { background: var(--teal); color: white; border: none; padding: 10px 20px; font-size: 14px; border-radius: 8px; cursor: pointer; font-weight: bold;}
+  .btn-primary:hover { background: var(--teal-dark); }
+  
+  input.manual-input, input.name-input {
+    width: 100%; min-width: 60px; box-sizing: border-box; border: 1px solid var(--line); padding: 6px; text-align: center; border-radius: 4px; font-family: var(--mono);
+  }
+  input.name-input { font-weight: bold; background: #fff; font-family: var(--sans); min-width: 80px;}
+  input:focus { outline: 2px solid var(--teal); border-color: transparent;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="hero">
     <h1>Solver Transportasi: NWC & Least Cost</h1>
-    <p>Unggah file .xlsx berisi tabel transportasi. Program akan otomatis membaca tabel dan menghitung total biaya menggunakan metode NWC dan LC. Sel yang tidak dialokasikan akan diberi tanda <b>X</b>.</p>
+    <p>Pilih metode input data: Unggah file Excel (.xlsx) atau isi tabel secara langsung (Manual). Anda dapat menambah/mengurangi jumlah sumber dan tujuan pada input manual.</p>
   </header>
 
-  <div class="card">
-    <h2>Unggah Dataset <span style="font-family:var(--mono); font-size:12px; background:var(--cream-2); color:var(--teal-dark); padding:2px 6px; border-radius:4px;">.xlsx</span></h2>
-    <p class="desc">Format tabel: Baris pertama berisi header tujuan dan kolom "Supply". Kolom pertama berisi nama sumber. Baris terakhir berisi "Demand" dan masing-masing permintaannya.</p>
-    <label class="dropzone" id="dropzone">
-      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
-      <strong>Klik untuk memilih file</strong> atau seret file Excel ke sini
-    </label>
-    <div id="upload-msg" class="msg"></div>
+  <div class="tabs">
+    <button class="tab-btn input-tab-btn active" data-tab="input-manual">📝 Input Manual</button>
+    <button class="tab-btn input-tab-btn" data-tab="input-upload">📁 Unggah File Excel</button>
   </div>
 
+  <!-- PANEL INPUT MANUAL -->
+  <div class="panel input-panel active" id="panel-input-manual">
+    <div class="card">
+      <h2>Isi Data Transportasi Manual</h2>
+      <p class="desc">Isi biaya transportasi di sel tengah, nama sumber/tujuan, serta kapasitas Supply dan Demand di sisi ujung.</p>
+      
+      <div class="control-group">
+        <button class="btn-sm" onclick="addRow()">+ Tambah Sumber (Baris)</button>
+        <button class="btn-sm" onclick="removeRow()">- Hapus Sumber</button>
+        <div style="width: 10px;"></div>
+        <button class="btn-sm" onclick="addCol()">+ Tambah Tujuan (Kolom)</button>
+        <button class="btn-sm" onclick="removeCol()">- Hapus Tujuan</button>
+      </div>
+
+      <div id="manual-msg"></div>
+
+      <div class="table-scroll">
+        <div id="manual-table-container"></div>
+      </div>
+      
+      <div style="margin-top: 15px; text-align: right;">
+        <button class="btn-primary" onclick="calculateFromManual()">🚀 Hitung Solusi Transportasi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL UPLOAD -->
+  <div class="panel input-panel" id="panel-input-upload">
+    <div class="card">
+      <h2>Unggah Dataset <span style="font-family:var(--mono); font-size:12px; background:var(--cream-2); color:var(--teal-dark); padding:2px 6px; border-radius:4px;">.xlsx</span></h2>
+      <p class="desc">Format tabel: Baris pertama header tujuan dan kolom ujung kanan "Supply". Kolom pertama nama sumber. Baris terakhir "Demand".</p>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+        <strong>Klik untuk memilih file</strong> atau seret file Excel ke sini
+      </label>
+      <div id="upload-msg" class="msg"></div>
+    </div>
+  </div>
+
+  <!-- HASIL -->
   <div class="card" id="dataset-card" style="display:none;">
     <h2>Tabel Biaya Transportasi Awal</h2>
     <div id="dataset-table" class="table-scroll"></div>
   </div>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="nwc">Metode NWC</button>
-    <button class="tab-btn" data-tab="lc">Metode Least Cost (LC)</button>
+  <div class="tabs" id="result-tabs" style="display:none;">
+    <button class="tab-btn result-tab-btn active" data-tab="nwc">Hasil NWC</button>
+    <button class="tab-btn result-tab-btn" data-tab="lc">Hasil Least Cost</button>
   </div>
 
-  <div class="panel active" id="panel-nwc">
+  <div class="panel result-panel active" id="panel-nwc" style="display:none;">
     <div class="card">
-      <h2>Hasil Alokasi North-West Corner (NWC)</h2>
+      <h2>Alokasi North-West Corner (NWC)</h2>
       <div id="nwc-table" class="table-scroll"></div>
       <div id="nwc-calc" class="calc-box"></div>
     </div>
   </div>
 
-  <div class="panel" id="panel-lc">
+  <div class="panel result-panel" id="panel-lc" style="display:none;">
     <div class="card">
-      <h2>Hasil Alokasi Least Cost (LC)</h2>
+      <h2>Alokasi Least Cost (LC)</h2>
       <div id="lc-table" class="table-scroll"></div>
       <div id="lc-calc" class="calc-box"></div>
     </div>
@@ -82,15 +137,128 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  // --- TAB LOGIC ---
+  document.querySelectorAll('.input-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.input-tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.input-panel').forEach(p=>p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     });
   });
 
+  document.querySelectorAll('.result-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.result-tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.result-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // --- MANUAL INPUT LOGIC ---
+  let manualData = {
+    sources: ["Pabrik 1", "Pabrik 2", "Pabrik 3"],
+    dests: ["Gudang A", "Gudang B", "Gudang C"],
+    costs: [[20,5,8], [15,20,10], [25,10,19]],
+    supply: [90, 60, 50],
+    demand: [50, 110, 40]
+  };
+
+  function renderManualTable() {
+    let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
+    manualData.dests.forEach((d, j) => {
+        html += `<th><input type="text" class="name-input dest-name" value="${d}" data-j="${j}" placeholder="Tujuan ${j+1}"></th>`;
+    });
+    html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
+
+    manualData.sources.forEach((s, i) => {
+        html += `<tr><th><input type="text" class="name-input src-name" value="${s}" data-i="${i}" placeholder="Sumber ${i+1}"></th>`;
+        manualData.costs[i].forEach((c, j) => {
+            html += `<td><input type="number" class="manual-input cost-val" value="${c}" data-i="${i}" data-j="${j}"></td>`;
+        });
+        html += `<th><input type="number" class="manual-input supply-val" value="${manualData.supply[i]}" data-i="${i}"></th></tr>`;
+    });
+
+    html += `<tr><th style="background:#1F4E78; color:white;">Demand</th>`;
+    manualData.demand.forEach((d, j) => {
+        html += `<th><input type="number" class="manual-input demand-val" value="${d}" data-j="${j}"></th>`;
+    });
+    html += `<th style="background:#E1DDD1; color:#1E2422;">Total</th></tr></tbody></table>`;
+
+    document.getElementById('manual-table-container').innerHTML = html;
+  }
+
+  function syncManualData() {
+    document.querySelectorAll('.dest-name').forEach(el => manualData.dests[el.dataset.j] = el.value || ("Tujuan " + (parseInt(el.dataset.j)+1)));
+    document.querySelectorAll('.src-name').forEach(el => manualData.sources[el.dataset.i] = el.value || ("Sumber " + (parseInt(el.dataset.i)+1)));
+    document.querySelectorAll('.cost-val').forEach(el => manualData.costs[el.dataset.i][el.dataset.j] = Number(el.value));
+    document.querySelectorAll('.supply-val').forEach(el => manualData.supply[el.dataset.i] = Number(el.value));
+    document.querySelectorAll('.demand-val').forEach(el => manualData.demand[el.dataset.j] = Number(el.value));
+  }
+
+  function addRow() {
+    syncManualData();
+    manualData.sources.push("Sumber " + (manualData.sources.length + 1));
+    manualData.costs.push(new Array(manualData.dests.length).fill(0));
+    manualData.supply.push(0);
+    renderManualTable();
+  }
+
+  function removeRow() {
+    if(manualData.sources.length <= 1) return;
+    syncManualData();
+    manualData.sources.pop();
+    manualData.costs.pop();
+    manualData.supply.pop();
+    renderManualTable();
+  }
+
+  function addCol() {
+    syncManualData();
+    manualData.dests.push("Tujuan " + (manualData.dests.length + 1));
+    manualData.costs.forEach(row => row.push(0));
+    manualData.demand.push(0);
+    renderManualTable();
+  }
+
+  function removeCol() {
+    if(manualData.dests.length <= 1) return;
+    syncManualData();
+    manualData.dests.pop();
+    manualData.costs.forEach(row => row.pop());
+    manualData.demand.pop();
+    renderManualTable();
+  }
+
+  function calculateFromManual() {
+    syncManualData();
+    let totSupp = manualData.supply.reduce((a,b)=>a+b, 0);
+    let totDem = manualData.demand.reduce((a,b)=>a+b, 0);
+    
+    let msgEl = document.getElementById('manual-msg');
+    if (totSupp !== totDem) {
+        msgEl.textContent = "Peringatan: Total Supply (" + totSupp + ") tidak sama dengan Total Demand (" + totDem + "). Tabel otomatis akan melanjutkan dengan batas terkecil, namun disarankan untuk menyamakan supply dan demand (Dummy).";
+        msgEl.className = 'msg warn';
+    } else {
+        msgEl.style.display = 'none';
+    }
+
+    renderOriginal(manualData.sources, manualData.dests, manualData.costs, manualData.supply, manualData.demand, Math.max(totSupp, totDem));
+
+    let nwcAlloc = solveNWC([...manualData.supply], [...manualData.demand]);
+    renderResult(nwcAlloc, manualData.costs, manualData.sources, manualData.dests, manualData.supply, manualData.demand, 'nwc');
+
+    let lcAlloc = solveLC([...manualData.supply], [...manualData.demand], manualData.costs);
+    renderResult(lcAlloc, manualData.costs, manualData.sources, manualData.dests, manualData.supply, manualData.demand, 'lc');
+
+    showResults();
+  }
+
+  // Initialize manual table
+  renderManualTable();
+
+  // --- UPLOAD LOGIC ---
   document.getElementById('file-input').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value=''; });
   const dz = document.getElementById('dropzone');
   ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
@@ -111,7 +279,7 @@
         const workbook = XLSX.read(data, {type: 'array'});
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ""});
-        processData(jsonData);
+        processUploadData(jsonData);
         document.getElementById('upload-msg').className = 'msg';
       } catch (err) {
         showError("Gagal membaca file: " + err.message);
@@ -120,29 +288,30 @@
     reader.readAsArrayBuffer(file);
   }
 
-  function processData(rows) {
+  function processUploadData(rows) {
     rows = rows.filter(r => r.some(cell => String(cell).trim() !== ''));
     if(rows.length < 3) throw new Error("Format tabel tidak lengkap.");
 
-    let destNames = rows[0].slice(1, -1).map(x => String(x).trim());
-    let sourceNames = rows.slice(1, -1).map(r => String(r[0]).trim());
+    let dests = rows[0].slice(1, -1).map(x => String(x).trim());
+    let sources = rows.slice(1, -1).map(r => String(r[0]).trim());
     
     let costs = rows.slice(1, -1).map(r => r.slice(1, -1).map(x => Number(x)));
     let supply = rows.slice(1, -1).map(r => Number(r[r.length - 1]));
     let demand = rows[rows.length - 1].slice(1, -1).map(x => Number(x));
     let totalSupply = supply.reduce((a,b)=>a+b, 0);
 
-    renderOriginal(sourceNames, destNames, costs, supply, demand, totalSupply);
+    renderOriginal(sources, dests, costs, supply, demand, totalSupply);
 
     let nwcAlloc = solveNWC([...supply], [...demand]);
-    renderResult(nwcAlloc, costs, sourceNames, destNames, supply, demand, 'nwc');
+    renderResult(nwcAlloc, costs, sources, dests, supply, demand, 'nwc');
 
     let lcAlloc = solveLC([...supply], [...demand], costs);
-    renderResult(lcAlloc, costs, sourceNames, destNames, supply, demand, 'lc');
+    renderResult(lcAlloc, costs, sources, dests, supply, demand, 'lc');
 
-    document.getElementById('dataset-card').style.display = 'block';
+    showResults();
   }
 
+  // --- SOLVER ALGORITHMS ---
   function solveNWC(supply, demand) {
     let m = supply.length;
     let n = demand.length;
@@ -184,10 +353,18 @@
     return alloc;
   }
 
+  // --- RENDERING ---
+  function showResults() {
+    document.getElementById('dataset-card').style.display = 'block';
+    document.getElementById('result-tabs').style.display = 'flex';
+    document.querySelector('.result-tab-btn[data-tab="nwc"]').click();
+    document.getElementById('dataset-card').scrollIntoView({ behavior: 'smooth' });
+  }
+
   function renderOriginal(sources, dests, costs, supply, demand, total) {
     let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
     dests.forEach(d => html += `<th>${d}</th>`);
-    html += '<th>Supply</th></tr></thead><tbody>';
+    html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
     for(let i=0; i<sources.length; i++){
       html += `<tr><th>${sources[i]}</th>`;
       for(let j=0; j<dests.length; j++){
@@ -195,9 +372,9 @@
       }
       html += `<th>${supply[i]}</th></tr>`;
     }
-    html += `<tr><th>Demand</th>`;
+    html += `<tr><th style="background:#1F4E78; color:white;">Demand</th>`;
     demand.forEach(d => html += `<th>${d}</th>`);
-    html += `<th>${total}</th></tr></tbody></table>`;
+    html += `<th style="background:#E1DDD1; color:#1E2422;">${total}</th></tr></tbody></table>`;
     document.getElementById('dataset-table').innerHTML = html;
   }
 
@@ -207,7 +384,7 @@
     
     let html = '<table><thead><tr><th>Sumber / Tujuan</th>';
     dests.forEach(d => html += `<th>${d}</th>`);
-    html += '<th>Supply</th></tr></thead><tbody>';
+    html += '<th style="background:#1F4E78; color:white;">Supply</th></tr></thead><tbody>';
     
     for(let i=0; i<sources.length; i++){
       html += `<tr><th>${sources[i]}</th>`;
@@ -224,10 +401,10 @@
       }
       html += `<th>${supply[i]}</th></tr>`;
     }
-    html += `<tr><th>Demand</th>`;
+    html += `<tr><th style="background:#1F4E78; color:white;">Demand</th>`;
     demand.forEach(d => html += `<th>${d}</th>`);
     let total = supply.reduce((a,b)=>a+b,0);
-    html += `<th>${total}</th></tr></tbody></table>`;
+    html += `<th style="background:#E1DDD1; color:#1E2422;">${total}</th></tr></tbody></table>`;
     
     document.getElementById(`${prefix}-table`).innerHTML = html;
     document.getElementById(`${prefix}-calc`).innerHTML = 
